@@ -68,7 +68,7 @@ export default class SideSwipe extends Component<CarouselProps, State> {
     };
 
     this.panResponder = PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => this.handleGestureCapture,
       onMoveShouldSetPanResponder: this.handleGestureCapture,
       onPanResponderGrant: this.handleGestureStart,
       onPanResponderMove: this.handleGestureMove,
@@ -140,13 +140,13 @@ export default class SideSwipe extends Component<CarouselProps, State> {
             { useNativeDriver: this.props.useNativeDriver }
           )}
           renderItem={({ item, index }) =>
-            renderItem({
-              item,
-              currentIndex,
-              itemIndex: index,
-              itemCount: dataLength,
-              animatedValue: animatedValue,
-            })
+              renderItem({
+                item,
+                currentIndex,
+                itemIndex: index,
+                itemCount: dataLength,
+                animatedValue: animatedValue,
+              })
           }
         />
       </View>
@@ -174,15 +174,18 @@ export default class SideSwipe extends Component<CarouselProps, State> {
   handleGestureStart = (e: GestureEvent, s: GestureState) =>
     this.props.onGestureStart(s);
 
-  handleGestureMove = (e: GestureEvent, { dx }: GestureState) => {
-    const currentOffset: number =
-      this.state.currentIndex * this.props.itemWidth;
-    const resolvedOffset: number = currentOffset - dx;
+  handleGestureMove = (e: GestureEvent, s: GestureState) => {
+    if(this.handleGestureCapture(e, s)) {
+      const { dx } = s;
+      const currentOffset: number =
+        this.state.currentIndex * this.props.itemWidth;
+      const resolvedOffset: number = currentOffset - dx;
 
-    this.list.scrollToOffset({
-      offset: resolvedOffset,
-      animated: false,
-    });
+      this.list.scrollToOffset({
+        offset: resolvedOffset,
+        animated: false,
+      });
+    }
   };
 
   handleGestureRelease = (e: GestureEvent, { dx, vx }: GestureState) => {
@@ -192,7 +195,7 @@ export default class SideSwipe extends Component<CarouselProps, State> {
     const resolvedIndex: number = Math.round(
       (resolvedOffset +
         (dx > 0 ? -this.props.threshold : this.props.threshold)) /
-        this.props.itemWidth
+      this.props.itemWidth
     );
 
     let newIndex: number;
@@ -203,16 +206,16 @@ export default class SideSwipe extends Component<CarouselProps, State> {
 
       newIndex =
         dx > 0
-          ? Math.max(resolvedIndex - velocityDifference, 0)
-          : Math.min(
-              resolvedIndex + velocityDifference,
-              this.props.data.length - 1
-            );
+        ? Math.max(resolvedIndex - velocityDifference, 0)
+        : Math.min(
+          resolvedIndex + velocityDifference,
+          this.props.data.length - 1
+        );
     } else {
       newIndex =
         dx > 0
-          ? Math.max(resolvedIndex, 0)
-          : Math.min(resolvedIndex, this.props.data.length - 1);
+        ? Math.max(resolvedIndex, 0)
+        : Math.min(resolvedIndex, this.props.data.length - 1);
     }
 
     this.list.scrollToIndex({
