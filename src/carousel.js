@@ -17,13 +17,10 @@ import type {
 } from '../types';
 
 const { width: screenWidth } = Dimensions.get('window');
-// const AnimatedFlatList = Animated.createAnimatedComponent(FlatList);
+const AnimatedFlatList = Animated.createAnimatedComponent(FlatList);
 
 type State = {
-  animatedValue: Animated.Value,
   currentIndex: number,
-  itemWidthAnim: Animated.Value,
-  scrollPosAnim: Animated.Value,
 };
 
 export default class SideSwipe extends Component<CarouselProps, State> {
@@ -52,29 +49,10 @@ export default class SideSwipe extends Component<CarouselProps, State> {
     super(props);
 
     const currentIndex: number = props.index || 0;
-    const initialOffset: number = currentIndex * props.itemWidth;
-    const scrollPosAnim: Animated.Value = new Animated.Value(initialOffset);
-    const itemWidthAnim: Animated.Value = new Animated.Value(props.itemWidth);
-    const animatedValue: Animated.Value = Animated.divide(
-      scrollPosAnim,
-      itemWidthAnim
-    );
 
     this.state = {
-      animatedValue,
       currentIndex,
-      itemWidthAnim,
-      scrollPosAnim,
     };
-
-    this.panResponder = PanResponder.create({
-      onStartShouldSetPanResponder: () => this.handleGestureCapture,
-      onMoveShouldSetPanResponder: this.handleGestureCapture,
-      onPanResponderGrant: this.handleGestureStart,
-      onPanResponderMove: this.handleGestureMove,
-      onPanResponderRelease: this.handleGestureRelease,
-      onPanResponderTerminationRequest: this.handleGestureTerminationRequest,
-    });
 
     this.visibilityConfig = {
       itemVisiblePercentThreshold: 60,
@@ -83,11 +61,7 @@ export default class SideSwipe extends Component<CarouselProps, State> {
   }
 
   componentDidUpdate = (prevProps: CarouselProps) => {
-    const { contentOffset, index, itemWidth } = this.props;
-
-    if (prevProps.itemWidth !== itemWidth) {
-      this.state.itemWidthAnim.setValue(itemWidth);
-    }
+    const { contentOffset, index } = this.props;
 
     if (Number.isInteger(index) && index !== prevProps.index) {
       this.setState(
@@ -95,7 +69,6 @@ export default class SideSwipe extends Component<CarouselProps, State> {
         () => {
           setTimeout(() =>
             this.list.scrollToIndex({
-              animated: true,
               index: this.state.currentIndex,
               viewOffset: contentOffset,
             })
@@ -117,45 +90,54 @@ export default class SideSwipe extends Component<CarouselProps, State> {
       itemWidth,
       shouldCapture
     } = this.props;
-    const { animatedValue, currentIndex, scrollPosAnim } = this.state;
+    const { currentIndex } = this.state;
     const dataLength = data.length;
 
     return (
       <View
-        style={[{ width: screenWidth }, style]}
+        style={[{ width: itemWidth }, style]}
       >
-        <FlatList
+        <AnimatedFlatList
+          ref={this.getRef}
           horizontal
+          data={data}
+          scrollEnabled={shouldCapture()}
+          style={[styles.flatList, flatListStyle]}
           contentContainerStyle={[
             { paddingHorizontal: contentOffset },
             contentContainerStyle,
           ]}
-          data={data}
-          snapToInterval={itemWidth}
-          snapToAlignment={'center'}
-          pagingEnabled={true}
-          disableIntervalMomentum={true}
-          decelerationRate={'fast'}
-          getItemLayout={this.getItemLayout}
-          keyExtractor={extractKey}
-          initialScrollIndex={currentIndex}
-          ref={this.getRef}
-          scrollEnabled={shouldCapture()}
+
+          showsVerticalScrollIndicator={false}
           showsHorizontalScrollIndicator={false}
-          style={[styles.flatList, flatListStyle]}
+
+          pagingEnabled={true}
+
+          decelerationRate={0}
+          disableIntervalMomentum={false}
+
           onEndReached={this.props.onEndReached}
           onEndReachedThreshold={this.props.onEndReachedThreshold}
-          scrollEventThrottle={1}
+
           onViewableItemsChanged={this.onViewableItemsChanged}
           viewabilityConfig={this.visibilityConfig}
-          onScroll={()=>{console.log('scroll')}}
+
+          initialScrollIndex={currentIndex}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { x: this.xOffset } } }],
+            { useNativeDriver: true }
+          )}
+          scrollEventThrottle={1}
+
+          keyExtractor={extractKey}
+          getItemLayout={this.getItemLayout}
           renderItem={({ item, index }) =>
               renderItem({
                 item,
                 currentIndex,
                 itemIndex: index,
                 itemCount: dataLength,
-                animatedValue: animatedValue,
+                animatedValue: this.transitionAnimation(index),
               })
           }
         />
@@ -169,6 +151,27 @@ export default class SideSwipe extends Component<CarouselProps, State> {
     }
   }
 
+  xOffset = new Animated.Value(0);
+
+  transitionAnimation = index => {
+    const { itemWidth } = this.props;
+    return {
+      transform: [
+        { perspective: 800 },
+        {
+          scale: this.xOffset.interpolate({
+            inputRange: [
+              (index - 1) * itemWidth,
+              index * itemWidth,
+              (index + 1) * itemWidth
+            ],
+            outputRange: [0.35, 1, 0.35]
+          })
+        },
+      ]
+    };
+  };
+
   getRef = (ref: *) => {
     if (ref) {
       this.list = ref._component ? ref._component : ref;
@@ -180,76 +183,6 @@ export default class SideSwipe extends Component<CarouselProps, State> {
     length: this.props.itemWidth,
     index,
   });
-
-  handleGestureTerminationRequest = (e: GestureEvent, s: GestureState) =>
-    this.props.shouldRelease(s);
-
-  handleGestureCapture = (e: GestureEvent, s: GestureState) =>
-    this.props.shouldCapture(s);
-
-  handleGestureStart = (e: GestureEvent, s: GestureState) =>
-    this.props.onGestureStart(s);
-
-  handleGestureMove = (e: GestureEvent, s: GestureState) => {
-    if(this.handleGestureCapture(e, s)) {
-      const { dx } = s;
-      const currentOffset: number =
-        this.state.currentIndex * this.props.itemWidth;
-      const resolvedOffset: number = currentOffset - dx;
-
-      this.list.scrollToOffset({
-        offset: resolvedOffset,
-        animated: false,
-      });
-    }
-  };
-
-  handleGestureRelease = (e: GestureEvent, s: GestureState) => {
-    if(!this.handleGestureCapture(e, s)) { return; }
-    const { dx, vx } = s;
-    const currentOffset: number =
-      this.state.currentIndex * this.props.itemWidth;
-    const resolvedOffset: number = currentOffset - dx;
-    const resolvedIndex: number = Math.round(
-      (resolvedOffset +
-        (dx > 0 ? -this.props.threshold : this.props.threshold)) /
-      this.props.itemWidth
-    );
-
-    let newIndex: number;
-    if (this.props.useVelocityForIndex) {
-      const absoluteVelocity: number = Math.round(Math.abs(vx));
-      const velocityDifference: number =
-        absoluteVelocity < 1 ? 0 : absoluteVelocity - 1;
-
-      newIndex =
-        dx > 0
-        ? Math.max(resolvedIndex - velocityDifference, 0)
-        : Math.min(
-          resolvedIndex + velocityDifference,
-          this.props.data.length - 1
-        );
-    } else {
-      newIndex =
-        dx > 0
-        ? Math.max(resolvedIndex, 0)
-        : Math.min(resolvedIndex, this.props.data.length - 1);
-    }
-
-    this.list.scrollToIndex({
-      index: newIndex,
-      animated: true,
-      viewOffset: this.props.contentOffset,
-    });
-
-    this.setState(
-      () => ({ currentIndex: newIndex }),
-      () => {
-        this.props.onIndexChange(newIndex);
-        this.props.onGestureRelease();
-      },
-    );
-  };
 }
 
 const styles = StyleSheet.create({
