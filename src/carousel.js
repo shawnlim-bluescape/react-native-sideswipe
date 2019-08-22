@@ -113,7 +113,7 @@ export default class SideSwipe extends Component<CarouselProps, State> {
 
           pagingEnabled={true}
 
-          decelerationRate={0}
+          decelerationRate={'fast'}
           disableIntervalMomentum={false}
 
           onEndReached={this.props.onEndReached}
