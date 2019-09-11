@@ -52,25 +52,27 @@ export default class SideSwipe extends Component<CarouselProps, State> {
 
     this.state = {
       currentIndex,
+      currentLayout: props.layout
     };
 
     this.visibilityConfig = {
-      itemVisiblePercentThreshold: 60,
+      itemVisiblePercentThreshold: 90,
       waitForInteraction: false
     }
   }
 
   componentDidUpdate = (prevProps: CarouselProps) => {
-    const { contentOffset, index } = this.props;
+    const { contentOffset, index, layout } = this.props;
 
-    if (Number.isInteger(index) && index !== prevProps.index) {
+    if (Number.isInteger(index) && ( index !== this.state.currentIndex || layout !== this.state.currentLayout)) {
       this.setState(
-        () => ({ currentIndex: index }),
+        () => ({ currentIndex: index, currentLayout: layout }),
         () => {
           setTimeout(() =>
             this.list.scrollToIndex({
               index: this.state.currentIndex,
               viewOffset: contentOffset,
+              animated: false
             })
           );
         }
