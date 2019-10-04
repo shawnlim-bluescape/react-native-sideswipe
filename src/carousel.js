@@ -57,7 +57,7 @@ export default class SideSwipe extends Component<CarouselProps, State> {
 
     this.visibilityConfig = {
       itemVisiblePercentThreshold: 90,
-      waitForInteraction: false
+      waitForInteraction: true
     }
   }
 
